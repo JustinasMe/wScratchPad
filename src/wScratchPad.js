@@ -174,10 +174,15 @@
       e.pageY = Math.floor(e.pageY - this.canvasOffset.top);
       
       this['_scratch' + event](e);
-      
-      if (this.options.realtime || event === 'Up') {
+
+      if (this.options.realtime || event !== 'Move') {
         if (this.options['scratch' + event]) {
-          this.options['scratch' + event].apply(this, [e, this._scratchPercent()]);
+         // Setup callback to execute later, since scratch percentage calculation takes too long in some mobile browsers
+         // and will cause Chrome to fire a "touchcancel" event prematurely when touching down at first.
+         var _this = this;
+         setTimeout(function() {
+           _this.options['scratch' + event].apply(_this, [e, _this._scratchPercent()]);
+         }, 0);
         }
       }
     },
@@ -277,7 +282,7 @@
     size        : 5,          // The size of the brush/scratch.
     bg          : '#cacaca',  // Background (image path or hex color).
     fg          : '#6699ff',  // Foreground (image path or hex color).
-    realtime    : true,       // Calculates percentage in realitime
+    realtime    : true,       // Calculates percentage in real time (on move events, not just mouse up).
     scratchDown : null,       // Set scratchDown callback.
     scratchUp   : null,       // Set scratchUp callback.
     scratchMove : null,       // Set scratcMove callback.
@@ -285,13 +290,14 @@
   };
 
   $.fn.bindMobileEvents = function () {
-    $(this).on('touchstart touchmove touchend touchcancel', function (event) {
+    var eventFunc = function(event) {
       var touches = (event.changedTouches || event.originalEvent.targetTouches),
           first = touches[0],
           type = '';
 
       switch (event.type) {
       case 'touchstart':
+        event.preventDefault();
         type = 'mousedown';
         break;
       case 'touchmove':
@@ -314,6 +320,10 @@
       );
 
       first.target.dispatchEvent(simulatedEvent);
+    };
+
+    $(this).on('touchstart touchmove touchcancel', eventFunc).each(function () {
+      this.addEventListener('touchend', eventFunc);
     });
   };
 })(jQuery);
